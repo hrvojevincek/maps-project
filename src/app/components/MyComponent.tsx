@@ -173,7 +173,12 @@ function MyComponent() {
         />
       ))}
 
-      {directions && <DirectionsRenderer map={map} directions={directions} />}
+      {directions && (
+        <DirectionsRenderer
+          directions={directions}
+          options={{ preserveViewport: true }}
+        />
+      )}
 
       {selectedRestaurant && (
         <InfoWindow
@@ -185,18 +190,23 @@ function MyComponent() {
         >
           <div className="text-black">
             <h2>{selectedRestaurant.name}</h2>
-            {selectedRestaurant.vicinity && (
-              <p>{selectedRestaurant.vicinity}</p>
-            )}
-            {distances.length && (
+            <p>{selectedRestaurant?.vicinity}</p>
+            {distances.length > 0 &&
+            selectedRestaurant &&
+            distances[restaurants.indexOf(selectedRestaurant)] &&
+            distances[restaurants.indexOf(selectedRestaurant)].distance ? (
               <p>
-                Distance from you:{" "}
+                Distance from you:
                 {
                   distances[restaurants.indexOf(selectedRestaurant)].distance
                     .text
                 }
               </p>
-            )}
+            ) : null}
+            <p>
+              Time to reach (by walking):{" "}
+              {distances[restaurants.indexOf(selectedRestaurant)].duration.text}
+            </p>
           </div>
         </InfoWindow>
       )}

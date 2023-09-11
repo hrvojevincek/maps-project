@@ -4,6 +4,7 @@ import {
   useJsApiLoader,
   Marker,
   InfoWindow,
+  DirectionsRenderer,
 } from "@react-google-maps/api";
 
 const containerStyle = {
@@ -12,11 +13,7 @@ const containerStyle = {
 };
 
 function MyComponent() {
-  const [map, setMap] = React.useState(null);
-  const [center, setCenter] = useState({ lat: 51.525, lng: -0.06 });
-  const [restaurants, setRestaurants] = useState([]);
-  const [selectedRestaurant, setSelectedRestaurant] = useState(null);
-
+  //! FINDING USER LOCATION
   function success(pos: any) {
     var crd = pos.coords;
     setCenter({ lat: crd.latitude, lng: crd.longitude });
@@ -36,46 +33,24 @@ function MyComponent() {
     maximumAge: 0,
   };
 
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.permissions
-        .query({ name: "geolocation" })
-        .then(function (result) {
-          if (result.state === "granted") {
-            //If granted then you can directly call your function here
-          } else if (result.state === "prompt") {
-            const position = navigator.geolocation.getCurrentPosition(
-              success,
-              errors,
-              options
-            );
-            console.log(result);
-          } else if (result.state === "denied") {
-            //If denied then you have to show instructions to enable location
-          }
-        });
-    } else {
-      console.log("Geolocation is not supported by this browser.");
-    }
-  }, []);
-
   const { isLoaded } = useJsApiLoader({
     id: "google-map-script",
     libraries: ["places"],
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
   });
 
+  // !application
+  const [map, setMap] = React.useState(null);
+  const [center, setCenter] = useState({ lat: 51.525, lng: -0.06 });
+  const [restaurants, setRestaurants] = useState([]);
+  const [selectedRestaurant, setSelectedRestaurant] = useState(null);
+
+  // !LOADINGMAP
   const onLoad = React.useCallback(function callback(map: any) {
-    // This is just an example of getting and using the map instance!!! don't just blindly copy!
-    // const bounds = new window.google.maps.LatLngBounds(center);
-    // map.fitBounds(bounds);
     setMap(map);
   }, []);
 
-  const onUnmount = React.useCallback(function callback(map: any) {
-    setMap(null);
-  }, []);
-
+  // !FINDING RESTAURANTS
   useEffect(() => {
     if (isLoaded && center) {
       const service = new window.google.maps.places.PlacesService(map);
@@ -83,7 +58,7 @@ function MyComponent() {
       const request = {
         location: center,
         radius: "1000", // You can adjust this value
-        type: ["restaurant"],
+        type: ["restaurant", "food"],
       };
 
       service.nearbySearch(request, (results, status) => {
@@ -103,6 +78,81 @@ function MyComponent() {
     scale: 0.3,
   };
 
+  // !CALCULATIN DISTANCE
+  const [distances, setDistances] = useState([]);
+  const [directions, setDirections] = useState(null);
+  const [error, setError] = useState(null);
+
+  let distanceMatrixService;
+  let directionsService;
+
+  if (isLoaded) {
+    distanceMatrixService = new google.maps.DistanceMatrixService();
+    directionsService = new google.maps.DirectionsService();
+  }
+
+  function computeDistances(myLatLng, destinations) {
+    const distanceMatrixService = new google.maps.DistanceMatrixService();
+
+    distanceMatrixService.getDistanceMatrix(
+      {
+        origins: [myLatLng],
+        destinations: destinations,
+        travelMode: google.maps.TravelMode.DRIVING,
+      },
+      (response, status) => {
+        console.log(response);
+        if (status === google.maps.DistanceMatrixStatus.OK) {
+          setDistances(response.rows[0].elements);
+        } else {
+          setError("Error fetching distances");
+        }
+      }
+    );
+  }
+  function fetchAndRenderDirections(myLatLng, destinationLatLng) {
+    const directionsService = new google.maps.DirectionsService();
+
+    const request = {
+      origin: myLatLng,
+      destination: destinationLatLng,
+      travelMode: google.maps.TravelMode.DRIVING,
+    };
+
+    directionsService.route(request, (result, status) => {
+      if (status === google.maps.DirectionsStatus.OK) {
+        setDirections(result);
+      } else {
+        setError("Error fetching directions");
+      }
+    });
+  }
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.permissions
+        .query({ name: "geolocation" })
+        .then(function (result) {
+          if (result.state === "prompt") {
+            navigator.geolocation.getCurrentPosition(success, errors, options);
+          } else if (result.state === "denied") {
+            console.log("denied access");
+          }
+        });
+    } else {
+      console.log("Geolocation is not supported by this browser.");
+    }
+    if (isLoaded && restaurants.length) {
+      const destinations = restaurants.map((r) => r.geometry.location);
+      computeDistances(center, destinations);
+    }
+  }, [isLoaded, restaurants, center, map]);
+
+  const onMarkerClick = (restaurant) => {
+    setSelectedRestaurant(restaurant);
+    fetchAndRenderDirections(center, restaurant.geometry.location);
+  };
+
   return isLoaded ? (
     <GoogleMap
       mapContainerClassName="z-1"
@@ -110,7 +160,6 @@ function MyComponent() {
       center={center}
       zoom={15}
       onLoad={onLoad}
-      onUnmount={onUnmount}
     >
       {/* Child components, such as markers, info windows, etc. */}
       <Marker icon={userLocationIcon} position={center} />
@@ -118,10 +167,11 @@ function MyComponent() {
         <Marker
           key={restaurant.place_id}
           position={restaurant.geometry.location}
-          onClick={() => setSelectedRestaurant(restaurant)}
+          onClick={() => onMarkerClick(restaurant)}
           icon={restaurantIcon}
         />
       ))}
+      {directions && <DirectionsRenderer map={map} directions={directions} />}
       {selectedRestaurant && (
         <InfoWindow
           options={{
@@ -131,13 +181,23 @@ function MyComponent() {
           onCloseClick={() => setSelectedRestaurant(null)}
         >
           <div className="text-black">
-            <p>{selectedRestaurant.name}</p>
+            <h2>{selectedRestaurant.name}</h2>
             {selectedRestaurant.vicinity && (
               <p>{selectedRestaurant.vicinity}</p>
+            )}
+            {distances.length && (
+              <p>
+                Distance from you:{" "}
+                {
+                  distances[restaurants.indexOf(selectedRestaurant)].distance
+                    .text
+                }
+              </p>
             )}
           </div>
         </InfoWindow>
       )}
+      {error && <div style={{ color: "red" }}>{error}</div>}
     </GoogleMap>
   ) : (
     <></>

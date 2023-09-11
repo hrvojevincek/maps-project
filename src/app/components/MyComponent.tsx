@@ -171,7 +171,9 @@ function MyComponent() {
           icon={restaurantIcon}
         />
       ))}
+
       {directions && <DirectionsRenderer map={map} directions={directions} />}
+
       {selectedRestaurant && (
         <InfoWindow
           options={{

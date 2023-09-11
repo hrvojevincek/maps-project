@@ -1,11 +1,7 @@
 import React, { useEffect, useState } from "react";
-import {
-  GoogleMap,
-  useJsApiLoader,
-  Marker,
-  InfoWindow,
-  DirectionsRenderer,
-} from "@react-google-maps/api";
+import { GoogleMap, useJsApiLoader, Marker } from "@react-google-maps/api";
+import SelectedRestaurantInfo from "./SelectedRestaurantInfo";
+import DirectionsRender from "./DirectionsRender";
 
 const containerStyle = {
   width: "800px",
@@ -154,8 +150,6 @@ function MyComponent() {
     fetchAndRenderDirections(center, restaurant.geometry.location);
   };
 
-  console.log("rendered");
-
   return isLoaded ? (
     <GoogleMap
       mapContainerClassName="z-1"
@@ -164,7 +158,6 @@ function MyComponent() {
       zoom={15}
       onLoad={onLoad}
     >
-      {/* Child components, such as markers, info windows, etc. */}
       <Marker icon={userLocationIcon} position={center} />
       {restaurants.map((restaurant) => (
         <Marker
@@ -175,43 +168,13 @@ function MyComponent() {
         />
       ))}
 
-      {directions && (
-        <DirectionsRenderer
-          map={map}
-          directions={directions}
-          options={{ preserveViewport: true }}
-        />
-      )}
+      {directions && <DirectionsRender directions={directions} />}
 
       {selectedRestaurant && (
-        <InfoWindow
-          options={{
-            pixelOffset: new window.google.maps.Size(0, -40),
-          }}
-          position={selectedRestaurant.geometry.location}
-          onCloseClick={() => setSelectedRestaurant(null)}
-        >
-          <div className="text-black">
-            <h2>{selectedRestaurant.name}</h2>
-            <p>{selectedRestaurant?.vicinity}</p>
-            {distances.length > 0 &&
-            selectedRestaurant &&
-            distances[restaurants.indexOf(selectedRestaurant)] &&
-            distances[restaurants.indexOf(selectedRestaurant)].distance ? (
-              <p>
-                Distance from you:
-                {
-                  distances[restaurants.indexOf(selectedRestaurant)].distance
-                    .text
-                }
-              </p>
-            ) : null}
-            <p>
-              Time to reach (by walking):{" "}
-              {distances[restaurants.indexOf(selectedRestaurant)].duration.text}
-            </p>
-          </div>
-        </InfoWindow>
+        <SelectedRestaurantInfo
+          restaurant={selectedRestaurant}
+          distances={distances}
+        />
       )}
       {error && <div style={{ color: "red" }}>{error}</div>}
     </GoogleMap>

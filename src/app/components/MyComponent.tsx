@@ -98,7 +98,7 @@ function MyComponent() {
       {
         origins: [myLatLng],
         destinations: destinations,
-        travelMode: google.maps.TravelMode.DRIVING,
+        travelMode: google.maps.TravelMode.WALKING,
       },
       (response, status) => {
         console.log(response);
@@ -110,13 +110,14 @@ function MyComponent() {
       }
     );
   }
+
   function fetchAndRenderDirections(myLatLng, destinationLatLng) {
     const directionsService = new google.maps.DirectionsService();
 
     const request = {
       origin: myLatLng,
       destination: destinationLatLng,
-      travelMode: google.maps.TravelMode.DRIVING,
+      travelMode: google.maps.TravelMode.WALKING,
     };
 
     directionsService.route(request, (result, status) => {

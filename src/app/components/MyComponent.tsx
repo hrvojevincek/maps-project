@@ -154,6 +154,8 @@ function MyComponent() {
     fetchAndRenderDirections(center, restaurant.geometry.location);
   };
 
+  console.log("rendered");
+
   return isLoaded ? (
     <GoogleMap
       mapContainerClassName="z-1"
@@ -175,6 +177,7 @@ function MyComponent() {
 
       {directions && (
         <DirectionsRenderer
+          map={map}
           directions={directions}
           options={{ preserveViewport: true }}
         />

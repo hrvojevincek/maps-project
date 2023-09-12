@@ -1,16 +1,46 @@
-import React, { useEffect, useState } from "react";
-import { GoogleMap, useJsApiLoader, Marker } from "@react-google-maps/api";
-import SelectedRestaurantInfo from "./SelectedRestaurantInfo";
+"use client";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  GoogleMap,
+  useJsApiLoader,
+  Marker,
+  InfoWindow,
+} from "@react-google-maps/api";
 import DirectionsRender from "./DirectionsRender";
+import {
+  LatLng,
+  Restaurant,
+  DistanceElement,
+  Directions,
+} from "../../types/types";
+import UserLocationMarker from "./UserLocationMarker";
 
 const containerStyle = {
   width: "800px",
   height: "800px",
 };
 
-function MyComponent() {
+const GoogleMapRenders: React.FC = () => {
+  // !application
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [center, setCenter] = useState<LatLng>({ lat: 51.525, lng: -0.06 });
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [selectedRestaurant, setSelectedRestaurant] =
+    useState<Restaurant | null>(null);
+
+  // !LOADINGMAP
+  const onLoad = useCallback(function callback(map: google.maps.Map) {
+    setMap(map);
+  }, []);
+
+  const { isLoaded } = useJsApiLoader({
+    id: "google-map-script",
+    libraries: ["places"],
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
+  });
+
   //! FINDING USER LOCATION
-  function success(pos: any) {
+  function success(pos: GeolocationPosition) {
     var crd = pos.coords;
     setCenter({ lat: crd.latitude, lng: crd.longitude });
     // console.log("Your current position is:");
@@ -19,32 +49,15 @@ function MyComponent() {
     // console.log(`More or less ${crd.accuracy} meters.`);
   }
 
-  function errors(err: any) {
+  function errors(err: GeolocationPositionError) {
     console.warn(`ERROR(${err.code}): ${err.message}`);
   }
 
-  var options = {
+  var options: PositionOptions = {
     enableHighAccuracy: true,
     timeout: 5000,
     maximumAge: 0,
   };
-
-  const { isLoaded } = useJsApiLoader({
-    id: "google-map-script",
-    libraries: ["places"],
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-  });
-
-  // !application
-  const [map, setMap] = React.useState(null);
-  const [center, setCenter] = useState({ lat: 51.525, lng: -0.06 });
-  const [restaurants, setRestaurants] = useState([]);
-  const [selectedRestaurant, setSelectedRestaurant] = useState(null);
-
-  // !LOADINGMAP
-  const onLoad = React.useCallback(function callback(map: any) {
-    setMap(map);
-  }, []);
 
   // !FINDING RESTAURANTS
   useEffect(() => {
@@ -53,20 +66,20 @@ function MyComponent() {
 
       const request = {
         location: center,
-        radius: "1000", // You can adjust this value
-        type: ["restaurant", "food"],
+        openNow: true,
+        radius: 1000,
+        type: "food",
       };
 
       service.nearbySearch(request, (results, status) => {
-        if (status === window.google.maps.places.PlacesServiceStatus.OK) {
-          setRestaurants(results.slice(0, 15)); // Get the top 10 results
+        if (results) {
+          if (status === window.google.maps.places.PlacesServiceStatus.OK) {
+            setRestaurants(results.slice(0, 15));
+          }
         }
       });
     }
   }, [center, isLoaded, map]);
-
-  const restaurantIcon =
-    "https://maps.google.com/mapfiles/ms/icons/blue-dot.png";
 
   const userLocationIcon = {
     fillOpacity: 2,
@@ -74,10 +87,13 @@ function MyComponent() {
     scale: 0.3,
   };
 
+  const restaurantIcon =
+    "https://maps.google.com/mapfiles/ms/icons/blue-dot.png";
+
   // !CALCULATIN DISTANCE
-  const [distances, setDistances] = useState([]);
-  const [directions, setDirections] = useState(null);
-  const [error, setError] = useState(null);
+  const [distances, setDistances] = useState<DistanceElement[]>([]);
+  const [directions, setDirections] = useState<Directions | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   let distanceMatrixService;
   let directionsService;
@@ -87,7 +103,7 @@ function MyComponent() {
     directionsService = new google.maps.DirectionsService();
   }
 
-  function computeDistances(myLatLng, destinations) {
+  function computeDistances(myLatLng: LatLng, destinations: LatLng[]) {
     const distanceMatrixService = new google.maps.DistanceMatrixService();
 
     distanceMatrixService.getDistanceMatrix(
@@ -96,10 +112,12 @@ function MyComponent() {
         destinations: destinations,
         travelMode: google.maps.TravelMode.WALKING,
       },
+
       (response, status) => {
-        console.log(response);
         if (status === google.maps.DistanceMatrixStatus.OK) {
-          setDistances(response.rows[0].elements);
+          if (response) {
+            setDistances(response.rows[0].elements);
+          }
         } else {
           setError("Error fetching distances");
         }
@@ -107,10 +125,13 @@ function MyComponent() {
     );
   }
 
-  function fetchAndRenderDirections(myLatLng, destinationLatLng) {
+  function fetchAndRenderDirections(
+    myLatLng: LatLng,
+    destinationLatLng: LatLng
+  ) {
     const directionsService = new google.maps.DirectionsService();
 
-    const request = {
+    const request: google.maps.DirectionsRequest = {
       origin: myLatLng,
       destination: destinationLatLng,
       travelMode: google.maps.TravelMode.WALKING,
@@ -139,16 +160,23 @@ function MyComponent() {
     } else {
       console.log("Geolocation is not supported by this browser.");
     }
+
     if (isLoaded && restaurants.length) {
       const destinations = restaurants.map((r) => r.geometry.location);
       computeDistances(center, destinations);
     }
   }, [isLoaded, restaurants, center, map]);
 
-  const onMarkerClick = (restaurant) => {
+  const onMarkerClick = (restaurant: Restaurant) => {
+    setDistances(distances);
     setSelectedRestaurant(restaurant);
     fetchAndRenderDirections(center, restaurant.geometry.location);
   };
+
+  if (isLoaded) {
+    distanceMatrixService = new google.maps.DistanceMatrixService();
+    directionsService = new google.maps.DirectionsService();
+  }
 
   return isLoaded ? (
     <GoogleMap
@@ -158,7 +186,8 @@ function MyComponent() {
       zoom={15}
       onLoad={onLoad}
     >
-      <Marker icon={userLocationIcon} position={center} />
+      <UserLocationMarker icon={userLocationIcon} position={center} />
+
       {restaurants.map((restaurant) => (
         <Marker
           key={restaurant.place_id}
@@ -171,16 +200,41 @@ function MyComponent() {
       {directions && <DirectionsRender directions={directions} />}
 
       {selectedRestaurant && (
-        <SelectedRestaurantInfo
-          restaurant={selectedRestaurant}
-          distances={distances}
-        />
+        <InfoWindow
+          options={{
+            pixelOffset: new window.google.maps.Size(0, -40),
+          }}
+          position={selectedRestaurant.geometry.location}
+          onCloseClick={() => setSelectedRestaurant(null)}
+        >
+          <div className="text-black">
+            <h2>{selectedRestaurant.name}</h2>
+            <p>{selectedRestaurant?.vicinity}</p>
+            {distances.length > 0 &&
+            selectedRestaurant &&
+            distances[restaurants.indexOf(selectedRestaurant)] &&
+            distances[restaurants.indexOf(selectedRestaurant)].distance ? (
+              <p>
+                Distance from you:
+                {
+                  distances[restaurants.indexOf(selectedRestaurant)].distance
+                    .text
+                }
+              </p>
+            ) : null}
+            <p>
+              Time to reach (by walking):{" "}
+              {distances[restaurants.indexOf(selectedRestaurant)].duration.text}
+            </p>
+          </div>
+        </InfoWindow>
       )}
+
       {error && <div style={{ color: "red" }}>{error}</div>}
     </GoogleMap>
   ) : (
     <></>
   );
-}
+};
 
-export default React.memo(MyComponent);
+export default React.memo(GoogleMapRenders);

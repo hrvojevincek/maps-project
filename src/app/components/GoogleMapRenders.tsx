@@ -1,7 +1,11 @@
 "use client";
 import React, { useCallback, useEffect, useState } from "react";
-import { GoogleMap, useJsApiLoader, Marker } from "@react-google-maps/api";
-import SelectedRestaurantInfo from "./SelectedRestaurantInfo";
+import {
+  GoogleMap,
+  useJsApiLoader,
+  Marker,
+  InfoWindow,
+} from "@react-google-maps/api";
 import DirectionsRender from "./DirectionsRender";
 import {
   LatLng,
@@ -60,7 +64,7 @@ const GoogleMapRenders: React.FC = () => {
     if (isLoaded && center) {
       const service = new window.google.maps.places.PlacesService(map);
 
-      const request: google.maps.places.PlaceSearchRequest = {
+      const request = {
         location: center,
         openNow: true,
         radius: 1000,
@@ -109,10 +113,7 @@ const GoogleMapRenders: React.FC = () => {
         travelMode: google.maps.TravelMode.WALKING,
       },
 
-      (
-        response: google.maps.DistanceMatrixResponse | null,
-        status: google.maps.DistanceMatrixStatus
-      ) => {
+      (response, status) => {
         if (status === google.maps.DistanceMatrixStatus.OK) {
           if (response) {
             setDistances(response.rows[0].elements);
@@ -167,6 +168,7 @@ const GoogleMapRenders: React.FC = () => {
   }, [isLoaded, restaurants, center, map]);
 
   const onMarkerClick = (restaurant: Restaurant) => {
+    setDistances(distances);
     setSelectedRestaurant(restaurant);
     fetchAndRenderDirections(center, restaurant.geometry.location);
   };
@@ -198,11 +200,36 @@ const GoogleMapRenders: React.FC = () => {
       {directions && <DirectionsRender directions={directions} />}
 
       {selectedRestaurant && (
-        <SelectedRestaurantInfo
-          restaurant={selectedRestaurant}
-          distances={distances}
-        />
+        <InfoWindow
+          options={{
+            pixelOffset: new window.google.maps.Size(0, -40),
+          }}
+          position={selectedRestaurant.geometry.location}
+          onCloseClick={() => setSelectedRestaurant(null)}
+        >
+          <div className="text-black">
+            <h2>{selectedRestaurant.name}</h2>
+            <p>{selectedRestaurant?.vicinity}</p>
+            {distances.length > 0 &&
+            selectedRestaurant &&
+            distances[restaurants.indexOf(selectedRestaurant)] &&
+            distances[restaurants.indexOf(selectedRestaurant)].distance ? (
+              <p>
+                Distance from you:
+                {
+                  distances[restaurants.indexOf(selectedRestaurant)].distance
+                    .text
+                }
+              </p>
+            ) : null}
+            <p>
+              Time to reach (by walking):{" "}
+              {distances[restaurants.indexOf(selectedRestaurant)].duration.text}
+            </p>
+          </div>
+        </InfoWindow>
       )}
+
       {error && <div style={{ color: "red" }}>{error}</div>}
     </GoogleMap>
   ) : (

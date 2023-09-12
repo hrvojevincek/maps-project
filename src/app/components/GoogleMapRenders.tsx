@@ -65,16 +65,15 @@ const GoogleMapRenders: React.FC = () => {
 
       const request = {
         location: center,
-        openNow: true,
-        radius: 1000,
-        type: "food",
+        radius: 2000,
+        type: "restaurant",
       };
 
       service.nearbySearch(request, (results, status) => {
-        if (results) {
-          if (status === window.google.maps.places.PlacesServiceStatus.OK) {
-            setRestaurants(results.slice(0, 15));
-          }
+        if (status === window.google.maps.places.PlacesServiceStatus.OK) {
+          setRestaurants(results.slice(0, 10));
+        } else {
+          console.error("PlacesService error:", status);
         }
       });
     }
@@ -216,15 +215,16 @@ const GoogleMapRenders: React.FC = () => {
             distances[restaurants.indexOf(selectedRestaurant)].distance ? (
               <p>
                 Distance from you:
-                {
-                  distances[restaurants.indexOf(selectedRestaurant)].distance
-                    .text
-                }
+                {distances[restaurants.indexOf(selectedRestaurant)].distance
+                  .text || "N/A"}
               </p>
             ) : null}
             <p>
               Time to reach (by walking):{" "}
-              {distances[restaurants.indexOf(selectedRestaurant)].duration.text}
+              {
+                distances[restaurants.indexOf(selectedRestaurant)]?.duration
+                  .text
+              }
             </p>
           </div>
         </InfoWindow>

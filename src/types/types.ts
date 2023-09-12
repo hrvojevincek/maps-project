@@ -1,10 +1,14 @@
+import { ReactNode } from "react";
+
 export type LatLng = {
   lat: number;
   lng: number;
 };
 
 export type Restaurant = {
-  place_id: string;
+  name: ReactNode;
+  vicinity: ReactNode;
+  place_id?: string;
   geometry: {
     location: LatLng;
   };

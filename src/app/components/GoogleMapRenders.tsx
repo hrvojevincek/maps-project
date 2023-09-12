@@ -1,24 +1,27 @@
 "use client";
-import React, { useCallback, useEffect, useState } from "react";
+
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   GoogleMap,
   useJsApiLoader,
   Marker,
   InfoWindow,
 } from "@react-google-maps/api";
-import DirectionsRender from "./DirectionsRender";
 import {
   LatLng,
   Restaurant,
   DistanceElement,
   Directions,
 } from "../../types/types";
+import DirectionsRender from "./DirectionsRender";
 import UserLocationMarker from "./UserLocationMarker";
 
 const containerStyle = {
   width: "800px",
   height: "800px",
 };
+
+const libraries = ["places"];
 
 const GoogleMapRenders: React.FC = () => {
   // !application
@@ -35,9 +38,11 @@ const GoogleMapRenders: React.FC = () => {
 
   const { isLoaded } = useJsApiLoader({
     id: "google-map-script",
-    libraries: ["places"],
+    libraries,
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
   });
+
+  const memoizedLoaded = useMemo(() => isLoaded, [isLoaded]);
 
   //! FINDING USER LOCATION
   function success(pos: GeolocationPosition) {
@@ -53,15 +58,9 @@ const GoogleMapRenders: React.FC = () => {
     console.warn(`ERROR(${err.code}): ${err.message}`);
   }
 
-  var options: PositionOptions = {
-    enableHighAccuracy: true,
-    timeout: 5000,
-    maximumAge: 0,
-  };
-
   // !FINDING RESTAURANTS
   useEffect(() => {
-    if (isLoaded && center) {
+    if (memoizedLoaded && center && map) {
       const service = new window.google.maps.places.PlacesService(map);
 
       const request = {
@@ -79,13 +78,7 @@ const GoogleMapRenders: React.FC = () => {
         }
       });
     }
-  }, [center, isLoaded, map]);
-
-  const userLocationIcon = {
-    fillOpacity: 2,
-    strokeWeight: 2,
-    scale: 0.3,
-  };
+  }, [center, memoizedLoaded, map]);
 
   const restaurantIcon =
     "https://maps.google.com/mapfiles/ms/icons/blue-dot.png";
@@ -98,7 +91,7 @@ const GoogleMapRenders: React.FC = () => {
   let distanceMatrixService;
   let directionsService;
 
-  if (isLoaded) {
+  if (memoizedLoaded) {
     distanceMatrixService = new google.maps.DistanceMatrixService();
     directionsService = new google.maps.DirectionsService();
   }
@@ -147,6 +140,12 @@ const GoogleMapRenders: React.FC = () => {
   }
 
   useEffect(() => {
+    var options: PositionOptions = {
+      enableHighAccuracy: true,
+      timeout: 5000,
+      maximumAge: 0,
+    };
+
     if (navigator.geolocation) {
       navigator.permissions
         .query({ name: "geolocation" })
@@ -161,11 +160,11 @@ const GoogleMapRenders: React.FC = () => {
       console.log("Geolocation is not supported by this browser.");
     }
 
-    if (isLoaded && restaurants.length) {
+    if (memoizedLoaded && restaurants.length) {
       const destinations = restaurants.map((r) => r.geometry.location);
       computeDistances(center, destinations);
     }
-  }, [isLoaded, restaurants, center, map]);
+  }, [memoizedLoaded, restaurants, center, map]);
 
   const onMarkerClick = (restaurant: Restaurant) => {
     setDistances(distances);
@@ -173,12 +172,13 @@ const GoogleMapRenders: React.FC = () => {
     fetchAndRenderDirections(center, restaurant.geometry.location);
   };
 
-  if (isLoaded) {
-    distanceMatrixService = new google.maps.DistanceMatrixService();
-    directionsService = new google.maps.DirectionsService();
-  }
+  const userLocationIcon = {
+    fillOpacity: 2,
+    strokeWeight: 2,
+    scale: 0.3,
+  };
 
-  return isLoaded ? (
+  return memoizedLoaded ? (
     <GoogleMap
       mapContainerClassName="z-1"
       mapContainerStyle={containerStyle}
